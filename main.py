@@ -104,6 +104,10 @@ if uploaded_file:
         st.subheader("📊 Model Performance Table")
         st.dataframe(results_df)
         
+        # Determine the best model based on testing accuracy
+        best_model_name = results_df['Testing Accuracy'].idxmax()
+        st.write(f"🏆 Best Model: {best_model_name}")
+
         # Visualization - Model Comparison
         st.subheader("📈 Model Performance Metrics")
         metrics = ['Precision', 'F1 Score', 'R2 Score', 'MAE']
@@ -146,11 +150,12 @@ if uploaded_file:
         # Prediction Interface
         st.subheader("🔮 Predict Water Quality")
         user_inputs = [st.number_input(f"{feature}", value=0.0) for feature in features]
-        input_scaled = scaler.transform([user_inputs])
         
         if st.button("Predict"):
+            # Only predict if the button is clicked
             input_scaled = scaler.transform([user_inputs])
-            prediction = models['Quadratic Discriminant Analysis'].predict(input_scaled)  # Using QDA for prediction
+            best_model = models[best_model_name]
+            prediction = best_model.predict(input_scaled)
             predicted_label = label_encoder.inverse_transform(prediction)[0]
             st.success(f"🔍 Predicted Water Quality: {predicted_label}")
             

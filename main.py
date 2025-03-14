@@ -86,7 +86,7 @@ if uploaded_file:
 
         results = {}
         skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-        
+
         for name, model in models.items():
             model.fit(X_train, y_train)
             y_test_pred = model.predict(X_test)
@@ -98,11 +98,16 @@ if uploaded_file:
 
             # Reduce Overfitting if Cross-Validation Accuracy > Testing Accuracy
             if cross_val_acc > test_acc + 0.03:  # If cross-val accuracy is significantly higher
-                model.set_params(**{
-                    'max_depth': max(model.get_params().get('max_depth', 5) - 1, 3),
-                    'n_estimators': max(model.get_params().get('n_estimators', 50) - 10, 50),
-                    'C': model.get_params().get('C', 0.5) * 0.8
-                })
+                params = model.get_params()
+
+                # Reduce complexity only if parameter exists in the model
+                if 'max_depth' in params:
+                    model.set_params(max_depth=max(params['max_depth'] - 1, 3))
+                if 'n_estimators' in params:
+                    model.set_params(n_estimators=max(params['n_estimators'] - 10, 50))
+                if 'C' in params:  # For SVM
+                    model.set_params(C=params['C'] * 0.8)
+
                 model.fit(X_train, y_train)  # Retrain model with reduced complexity
                 y_test_pred = model.predict(X_test)
                 test_acc = round(accuracy_score(y_test, y_test_pred), 4)  # Update test accuracy

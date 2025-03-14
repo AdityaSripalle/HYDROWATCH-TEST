@@ -10,8 +10,9 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, f1_score, mean_absolute_error, r2_score
 import xgboost as xgb
+from catboost import CatBoostClassifier
 
 # Streamlit App Configuration
 st.set_page_config(page_title="Water Quality Prediction", page_icon="💧", layout="wide")
@@ -59,30 +60,39 @@ if uploaded_file:
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
         
-        # Define all models
+        # Define models
         models = {
             'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_split=10, min_samples_leaf=4, random_state=42),
             'Naive Bayes': GaussianNB(),
             'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5),
             'Support Vector Machine': SVC(kernel='linear', random_state=42),
             'Logistic Regression': LogisticRegression(random_state=42, max_iter=200),
-            'XGBoost': xgb.XGBClassifier(n_estimators=50, max_depth=3, learning_rate=0.1, objective='multi:softmax', num_class=3, random_state=42)
+            'XGBoost': xgb.XGBClassifier(n_estimators=50, max_depth=3, learning_rate=0.1, objective='multi:softmax', num_class=3, random_state=42),
+            'CatBoost': CatBoostClassifier(iterations=1000, learning_rate=0.04, depth=6, random_seed=42, cat_features=[], verbose=200)
         }
         
+        # Dictionary to store results
         results = {}
+
+        # Train each model, calculate accuracy, and store the results
         for name, model in models.items():
             model.fit(X_train, y_train)
             y_train_pred = model.predict(X_train)
             y_test_pred = model.predict(X_test)
             
-            # Calculate training accuracy
+            # Calculate training and testing accuracy
             training_accuracy = accuracy_score(y_train, y_train_pred)
             testing_accuracy = accuracy_score(y_test, y_test_pred)
+            
+            try:
+                precision = precision_score(y_test, y_test_pred, average='weighted', zero_division=0)
+            except ValueError:
+                precision = 0.0  # In case there's an error calculating precision (e.g., no positive class)
             
             results[name] = {
                 'Training Accuracy': training_accuracy,
                 'Testing Accuracy': testing_accuracy,
-                'Precision': precision_score(y_test, y_test_pred, average='weighted', zero_division=0),
+                'Precision': precision,
                 'F1 Score': f1_score(y_test, y_test_pred, average='weighted'),
                 'R2 Score': r2_score(y_test, y_test_pred),
                 'MAE': mean_absolute_error(y_test, y_test_pred)

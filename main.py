@@ -12,7 +12,6 @@ from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 import xgboost as xgb
-from catboost import CatBoostClassifier
 
 # Streamlit App Configuration
 st.set_page_config(page_title="Water Quality Prediction", page_icon="💧", layout="wide")
@@ -67,8 +66,7 @@ if uploaded_file:
             'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5),
             'Support Vector Machine': SVC(kernel='linear', random_state=42),
             'Logistic Regression': LogisticRegression(random_state=42, max_iter=200),
-            'XGBoost': xgb.XGBClassifier(n_estimators=50, max_depth=3, learning_rate=0.1, objective='multi:softmax', num_class=3, random_state=42),
-            'CatBoost': CatBoostClassifier(iterations=1000, learning_rate=0.04, depth=6, random_seed=42, cat_features=[], verbose=200)
+            'XGBoost': xgb.XGBClassifier(n_estimators=50, max_depth=3, learning_rate=0.1, objective='multi:softmax', num_class=3, random_state=42)
         }
         
         results = {}

@@ -6,3 +6,5 @@ joblib
 imblearn
 matplotlib
 seaborn
+xgboost
+catboost

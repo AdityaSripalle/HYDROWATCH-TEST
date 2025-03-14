@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -10,7 +9,7 @@ from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, precision_score, f1_score, mean_absolute_error, r2_score
 from imblearn.over_sampling import SMOTE
 
-# Streamlit App Theme Configuration
+# Streamlit App Configuration
 st.set_page_config(page_title="Water Quality Prediction", page_icon="💧", layout="wide")
 st.title("💧 Water Quality Prediction")
 
@@ -60,11 +59,15 @@ if uploaded_file:
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
 
-        # Train models
+        # Train models (with hyperparameter tuning to prevent overfitting)
         models = {
-            'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
+            'Random Forest': RandomForestClassifier(
+                n_estimators=100, max_depth=10, min_samples_split=5, min_samples_leaf=3, random_state=42
+            ),
             'SVM': SVC(kernel='rbf', C=1, random_state=42, probability=True),
-            'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, random_state=42)
+            'Gradient Boosting': GradientBoostingClassifier(
+                n_estimators=100, learning_rate=0.1, max_depth=3, min_samples_split=5, random_state=42
+            )
         }
 
         results = {}
@@ -73,8 +76,12 @@ if uploaded_file:
             y_train_pred = model.predict(X_train)  # Predictions on training data
             y_test_pred = model.predict(X_test)  # Predictions on testing data
 
+            # Cross-validation score to measure true generalization
+            cross_val_accuracy = np.mean(cross_val_score(model, X_train, y_train, cv=5))
+
             results[name] = {
                 'Training Accuracy': accuracy_score(y_train, y_train_pred),
+                'Cross-Val Accuracy': cross_val_accuracy,
                 'Testing Accuracy': accuracy_score(y_test, y_test_pred),
                 'Precision': precision_score(y_test, y_test_pred, average='weighted', zero_division=0),
                 'F1 Score': f1_score(y_test, y_test_pred, average='weighted'),

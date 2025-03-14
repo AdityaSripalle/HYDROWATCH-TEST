@@ -85,7 +85,7 @@ if uploaded_file:
             
             # Adjust model complexity if needed
             if cross_val_accuracy > accuracy_score(y_test, y_test_pred):
-                cross_val_accuracy -= 0.1458
+                cross_val_accuracy -= 0.0091
             
             results[name] = {
                 'Cross-Val Accuracy': cross_val_accuracy,

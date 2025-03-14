@@ -12,6 +12,8 @@ from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, f1_score, mean_absolute_error, r2_score
 import xgboost as xgb
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.metrics import confusion_matrix, classification_report
 
 # Streamlit App Configuration
 st.set_page_config(page_title="Water Quality Prediction", page_icon="💧", layout="wide")
@@ -66,7 +68,8 @@ if uploaded_file:
             'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5),
             'Support Vector Machine': SVC(kernel='linear', random_state=42),
             'Logistic Regression': LogisticRegression(random_state=42, max_iter=200),
-            'XGBoost': xgb.XGBClassifier(n_estimators=50, max_depth=3, learning_rate=0.1, objective='multi:softmax', num_class=3, random_state=42)
+            'XGBoost': xgb.XGBClassifier(n_estimators=50, max_depth=3, learning_rate=0.1, objective='multi:softmax', num_class=3, random_state=42),
+            'Quadratic Discriminant Analysis': QuadraticDiscriminantAnalysis()  # Adding QDA model
         }
         
         # Dictionary to store results
@@ -115,7 +118,7 @@ if uploaded_file:
                 ax.text(i, v + 0.01, f"{v:.2f}", ha='center', fontsize=10)
             st.pyplot(fig)
         
-        # Training Accuracy vs Testing Accuracy
+        # Training Accuracy vs Testing Accuracy (Including QDA)
         st.subheader("📈 Training Accuracy vs Testing Accuracy")
         fig, ax = plt.subplots()
         results_df[['Training Accuracy', 'Testing Accuracy']].plot(kind='bar', ax=ax, figsize=(10, 5), colormap='coolwarm')
@@ -125,6 +128,21 @@ if uploaded_file:
         plt.legend()
         st.pyplot(fig)
         
+        # Quadratic Discriminant Analysis (QDA) Performance
+        st.write("QDA Classification Report:")
+        qda_model = models['Quadratic Discriminant Analysis']
+        y_test_pred_qda = qda_model.predict(X_test)
+        st.text(classification_report(y_test, y_test_pred_qda))
+        
+        # Confusion Matrix for QDA
+        cm_qda = confusion_matrix(y_test, y_test_pred_qda)
+        fig, ax = plt.subplots(figsize=(6, 6))
+        sns.heatmap(cm_qda, annot=True, fmt='g', cmap='Blues', xticklabels=label_encoder.classes_, yticklabels=label_encoder.classes_)
+        plt.title('Quadratic Discriminant Analysis (QDA) Confusion Matrix')
+        plt.ylabel('True Label')
+        plt.xlabel('Predicted Label')
+        st.pyplot(fig)
+
         # Prediction Interface
         st.subheader("🔮 Predict Water Quality")
         user_inputs = [st.number_input(f"{feature}", value=0.0) for feature in features]
@@ -132,7 +150,7 @@ if uploaded_file:
         
         if st.button("Predict"):
             input_scaled = scaler.transform([user_inputs])
-            prediction = best_model.predict(input_scaled)
+            prediction = models['Quadratic Discriminant Analysis'].predict(input_scaled)  # Using QDA for prediction
             predicted_label = label_encoder.inverse_transform(prediction)[0]
             st.success(f"🔍 Predicted Water Quality: {predicted_label}")
             

@@ -55,7 +55,9 @@ if uploaded_file:
         X_resampled, y_resampled = smote.fit_resample(X, y)
 
         # Split data
-        X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_resampled, y_resampled, test_size=0.2, random_state=42
+        )
 
         # Scale data
         scaler = StandardScaler()
@@ -64,8 +66,12 @@ if uploaded_file:
 
         # Train models (Hyperparameter tuning included)
         models = {
-            'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=10, min_samples_split=5, min_samples_leaf=3, random_state=42),
-            'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, min_samples_split=5, random_state=42),
+            'Random Forest': RandomForestClassifier(
+                n_estimators=100, max_depth=10, min_samples_split=5, min_samples_leaf=3, random_state=42
+            ),
+            'Gradient Boosting': GradientBoostingClassifier(
+                n_estimators=100, learning_rate=0.1, max_depth=3, min_samples_split=5, random_state=42
+            ),
             'SVM': SVC(kernel='rbf', C=1, random_state=42, probability=True),
             'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5, metric='minkowski', p=2),
             'Decision Tree': DecisionTreeClassifier(max_depth=8, min_samples_split=5, random_state=42),
@@ -75,14 +81,12 @@ if uploaded_file:
         results = {}
         for name, model in models.items():
             model.fit(X_train, y_train)
-            y_train_pred = model.predict(X_train)  # Predictions on training data
             y_test_pred = model.predict(X_test)  # Predictions on testing data
 
             # Cross-validation accuracy for generalization check
             cross_val_accuracy = np.mean(cross_val_score(model, X_train, y_train, cv=5))
 
             results[name] = {
-               
                 'Cross-Val Accuracy': cross_val_accuracy,
                 'Testing Accuracy': accuracy_score(y_test, y_test_pred),
                 'Precision': precision_score(y_test, y_test_pred, average='weighted', zero_division=0),
@@ -100,10 +104,12 @@ if uploaded_file:
         best_model_name = max(results, key=lambda x: results[x]['Testing Accuracy'])
         best_model = models[best_model_name]
 
-        # Visualization - Training vs Testing Accuracy
+        # Visualization - Cross-Val Accuracy vs Testing Accuracy
         st.subheader("📈 Cross-Val Accuracy vs Testing Accuracy Comparison")
         fig, ax = plt.subplots()
-        results_df[['Cross-Val Accuracy', 'Testing Accuracy']].plot(kind='bar', ax=ax, figsize=(10, 5), colormap='coolwarm')
+        results_df[['Cross-Val Accuracy', 'Testing Accuracy']].plot(
+            kind='bar', ax=ax, figsize=(10, 5), colormap='coolwarm'
+        )
         plt.xticks(rotation=45)
         plt.ylabel("Accuracy")
         plt.title("Cross-Val Accuracy vs Testing Accuracy for Different Models")

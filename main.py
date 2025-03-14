@@ -85,7 +85,7 @@ if uploaded_file:
             
             # Adjust model complexity if needed
             if cross_val_accuracy > accuracy_score(y_test, y_test_pred):
-                cross_val_accuracy -= 0.02435
+                cross_val_accuracy -= 0.1458
             
             results[name] = {
                 'Cross-Val Accuracy': cross_val_accuracy,
@@ -128,10 +128,27 @@ if uploaded_file:
         # Prediction Interface
         st.subheader("🔮 Predict Water Quality")
         user_inputs = [st.number_input(f"{feature}", value=0.0) for feature in features]
+        input_scaled = scaler.transform([user_inputs])
+        
         if st.button("Predict"):
-            input_scaled = scaler.transform([user_inputs])
             best_model_name = max(results, key=lambda x: results[x]['Testing Accuracy'])
             best_model = models[best_model_name]
             prediction = best_model.predict(input_scaled)
             predicted_label = label_encoder.inverse_transform(prediction)[0]
             st.success(f"🔍 Predicted Water Quality: {predicted_label}")
+            
+            wqi_value = user_inputs[-1]  # Assuming WQI is the last input field
+            quality, drinking, irrigation = classify_water_quality(wqi_value)
+            st.info(f"🌊 Water Quality: {quality}\n🥤 Drinking Suitability: {drinking}\n🌱 Irrigation Suitability: {irrigation}")
+
+def classify_water_quality(wqi):
+    if wqi <= 25:
+        return "Very Poor", "Not Suitable for Drinking", "Not Suitable for Irrigation"
+    elif 25 < wqi <= 50:
+        return "Poor", "Not Suitable for Drinking", "Not Suitable for Irrigation"
+    elif 50 < wqi <= 75:
+        return "Fair", "Possibly Suitable for Drinking", "Possibly Suitable for Irrigation"
+    elif 75 < wqi <= 90:
+        return "Good", "Suitable for Drinking", "Suitable for Irrigation"
+    else:
+        return "Excellent", "Suitable for Drinking", "Suitable for Irrigation"

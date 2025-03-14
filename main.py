@@ -3,16 +3,16 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import accuracy_score, precision_score, f1_score, mean_absolute_error, r2_score
-from imblearn.over_sampling import SMOTE
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+import xgboost as xgb
+from catboost import CatBoostClassifier
 
 # Streamlit App Configuration
 st.set_page_config(page_title="Water Quality Prediction", page_icon="💧", layout="wide")
@@ -52,44 +52,38 @@ if uploaded_file:
         X = df_cleaned[features]
         y = df_cleaned[target]
         
-        # Handle class imbalance using SMOTE
-        smote = SMOTE(random_state=42)
-        X_resampled, y_resampled = smote.fit_resample(X, y)
-        
         # Split data
-        X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
         # Scale data
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
         
-        # Train models
+        # Define all models
         models = {
-            'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=10, min_samples_split=5, min_samples_leaf=3, random_state=42),
-            'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, min_samples_split=5, random_state=42),
-            'SVM': SVC(kernel='rbf', C=1, random_state=42, probability=True),
-            'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5, metric='minkowski', p=2),
-            'Decision Tree': DecisionTreeClassifier(max_depth=8, min_samples_split=5, random_state=42),
-            'Logistic Regression': LogisticRegression(max_iter=1000, solver='lbfgs', random_state=42),
-            'Naive Bayes': GaussianNB()
+            'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=5, min_samples_split=10, min_samples_leaf=4, random_state=42),
+            'Naive Bayes': GaussianNB(),
+            'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5),
+            'Support Vector Machine': SVC(kernel='linear', random_state=42),
+            'Logistic Regression': LogisticRegression(random_state=42, max_iter=200),
+            'XGBoost': xgb.XGBClassifier(n_estimators=50, max_depth=3, learning_rate=0.1, objective='multi:softmax', num_class=3, random_state=42),
+            'CatBoost': CatBoostClassifier(iterations=1000, learning_rate=0.04, depth=6, random_seed=42, cat_features=[], verbose=200)
         }
         
         results = {}
         for name, model in models.items():
             model.fit(X_train, y_train)
+            y_train_pred = model.predict(X_train)
             y_test_pred = model.predict(X_test)
             
-            # Cross-validation accuracy
-            cross_val_accuracy = np.mean(cross_val_score(model, X_train, y_train, cv=5))
-            
-            # Adjust model complexity if needed
-            if cross_val_accuracy > accuracy_score(y_test, y_test_pred):
-                cross_val_accuracy -= 0.0091
+            # Calculate training accuracy
+            training_accuracy = accuracy_score(y_train, y_train_pred)
+            testing_accuracy = accuracy_score(y_test, y_test_pred)
             
             results[name] = {
-                'Cross-Val Accuracy': cross_val_accuracy,
-                'Testing Accuracy': accuracy_score(y_test, y_test_pred),
+                'Training Accuracy': training_accuracy,
+                'Testing Accuracy': testing_accuracy,
                 'Precision': precision_score(y_test, y_test_pred, average='weighted', zero_division=0),
                 'F1 Score': f1_score(y_test, y_test_pred, average='weighted'),
                 'R2 Score': r2_score(y_test, y_test_pred),
@@ -116,12 +110,12 @@ if uploaded_file:
             st.pyplot(fig)
         
         # Cross-Val Accuracy vs Testing Accuracy
-        st.subheader("📈 Cross-Val Accuracy vs Testing Accuracy")
+        st.subheader("📈 Training Accuracy vs Testing Accuracy")
         fig, ax = plt.subplots()
-        results_df[['Cross-Val Accuracy', 'Testing Accuracy']].plot(kind='bar', ax=ax, figsize=(10, 5), colormap='coolwarm')
+        results_df[['Training Accuracy', 'Testing Accuracy']].plot(kind='bar', ax=ax, figsize=(10, 5), colormap='coolwarm')
         plt.xticks(rotation=45)
         plt.ylabel("Accuracy")
-        plt.title("Cross-Val Accuracy vs Testing Accuracy for Different Models")
+        plt.title("Training Accuracy vs Testing Accuracy for Different Models")
         plt.legend()
         st.pyplot(fig)
         

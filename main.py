@@ -131,8 +131,7 @@ if uploaded_file:
         input_scaled = scaler.transform([user_inputs])
         
         if st.button("Predict"):
-            best_model_name = max(results, key=lambda x: results[x]['Testing Accuracy'])
-            best_model = models[best_model_name]
+            input_scaled = scaler.transform([user_inputs])
             prediction = best_model.predict(input_scaled)
             predicted_label = label_encoder.inverse_transform(prediction)[0]
             st.success(f"🔍 Predicted Water Quality: {predicted_label}")

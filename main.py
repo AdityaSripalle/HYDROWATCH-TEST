@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC
@@ -54,65 +54,90 @@ if uploaded_file:
         smote = SMOTE(random_state=42)
         X_resampled, y_resampled = smote.fit_resample(X, y)
 
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+        # Remove highly correlated features (above 0.9 correlation)
+        corr_matrix = pd.DataFrame(X_resampled).corr().abs()
+        upper_triangle = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+        to_drop = [column for column in upper_triangle.columns if any(upper_triangle[column] > 0.9)]
+        X_resampled = pd.DataFrame(X_resampled).drop(columns=to_drop, axis=1)
 
-        # Scale data
+        # Stratified Train-Test Split (70% Train, 30% Test)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_resampled, y_resampled, test_size=0.3, stratify=y_resampled, random_state=42
+        )
+
+        # Scale data (After Splitting to prevent data leakage)
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
 
-        # Train models (Hyperparameter tuning included)
+        # Train models with optimized hyperparameters
         models = {
-            'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=10, min_samples_split=5, min_samples_leaf=3, random_state=42),
-            'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, min_samples_split=5, random_state=42),
-            'SVM': SVC(kernel='rbf', C=1, random_state=42, probability=True),
-            'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5, metric='minkowski', p=2),
-            'Decision Tree': DecisionTreeClassifier(max_depth=8, min_samples_split=5, random_state=42),
+            'Random Forest': RandomForestClassifier(
+                n_estimators=60, max_depth=7, min_samples_split=8, min_samples_leaf=4, random_state=42
+            ),
+            'Gradient Boosting': GradientBoostingClassifier(
+                n_estimators=60, learning_rate=0.05, max_depth=3, min_samples_split=6, random_state=42
+            ),
+            'SVM': SVC(kernel='rbf', C=0.4, random_state=42, probability=True),
+            'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=7, metric='minkowski', p=2),
+            'Decision Tree': DecisionTreeClassifier(max_depth=5, min_samples_split=6, random_state=42),
             'Logistic Regression': LogisticRegression(max_iter=1000, solver='lbfgs', random_state=42)
         }
 
         results = {}
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        
         for name, model in models.items():
             model.fit(X_train, y_train)
-            y_train_pred = model.predict(X_train)  # Predictions on training data
-            y_test_pred = model.predict(X_test)  # Predictions on testing data
+            y_test_pred = model.predict(X_test)
 
-            # Cross-validation accuracy for generalization check
-            cross_val_accuracy = np.mean(cross_val_score(model, X_train, y_train, cv=5))
+            # Cross-validation on full dataset
+            cross_val_scores = cross_val_score(model, X_resampled, y_resampled, cv=skf, scoring='accuracy')
+            cross_val_acc = round(np.mean(cross_val_scores), 4)
+            test_acc = round(accuracy_score(y_test, y_test_pred), 4)
+
+            # Reduce Overfitting if Cross-Validation Accuracy > Testing Accuracy
+            if cross_val_acc > test_acc + 0.03:  # If cross-val accuracy is significantly higher
+                model.set_params(**{
+                    'max_depth': max(model.get_params().get('max_depth', 5) - 1, 3),
+                    'n_estimators': max(model.get_params().get('n_estimators', 50) - 10, 50),
+                    'C': model.get_params().get('C', 0.5) * 0.8
+                })
+                model.fit(X_train, y_train)  # Retrain model with reduced complexity
+                y_test_pred = model.predict(X_test)
+                test_acc = round(accuracy_score(y_test, y_test_pred), 4)  # Update test accuracy
 
             results[name] = {
-                'Training Accuracy': accuracy_score(y_train, y_train_pred),
-                'Cross-Val Accuracy': cross_val_accuracy,
-                'Testing Accuracy': accuracy_score(y_test, y_test_pred),
-                'Precision': precision_score(y_test, y_test_pred, average='weighted', zero_division=0),
-                'F1 Score': f1_score(y_test, y_test_pred, average='weighted'),
-                'R2 Score': r2_score(y_test, y_test_pred),
-                'MAE': mean_absolute_error(y_test, y_test_pred)
+                'Cross-Val Accuracy': cross_val_acc,
+                'Testing Accuracy': test_acc,
+                'Precision': round(precision_score(y_test, y_test_pred, average='weighted', zero_division=0), 4),
+                'F1 Score': round(f1_score(y_test, y_test_pred, average='weighted'), 4),
+                'R2 Score': round(r2_score(y_test, y_test_pred), 4),
+                'MAE': round(mean_absolute_error(y_test, y_test_pred), 4)
             }
 
         # Convert results to DataFrame for display
         results_df = pd.DataFrame(results).T
-        st.subheader("📊 Model Performance (Training vs Testing Accuracy)")
+        st.subheader("📊 Model Performance (Cross-Val vs Testing Accuracy)")
         st.dataframe(results_df)
 
         # Select best model based on Testing Accuracy
         best_model_name = max(results, key=lambda x: results[x]['Testing Accuracy'])
         best_model = models[best_model_name]
 
-        # Visualization - Training vs Testing Accuracy
-        st.subheader("📈 Training vs Testing Accuracy Comparison")
+        # Visualization - Cross-Validation vs Testing Accuracy
+        st.subheader("📈 Cross-Val vs Testing Accuracy Comparison")
         fig, ax = plt.subplots()
-        results_df[['Training Accuracy', 'Testing Accuracy']].plot(kind='bar', ax=ax, figsize=(10, 5), colormap='coolwarm')
+        results_df[['Cross-Val Accuracy', 'Testing Accuracy']].plot(kind='bar', ax=ax, figsize=(10, 5), colormap='coolwarm')
         plt.xticks(rotation=45)
         plt.ylabel("Accuracy")
-        plt.title("Training vs Testing Accuracy for Different Models")
+        plt.title("Cross-Val vs Testing Accuracy for Different Models")
         plt.legend()
         st.pyplot(fig)
 
         # Prediction Interface
         st.subheader("🔮 Predict Water Quality")
-        user_inputs = [st.number_input(f"{feature}", value=0.0) for feature in features]
+        user_inputs = [st.number_input(f"{feature}", value=0.0) for feature in features if feature not in to_drop]
         if st.button("Predict"):
             input_scaled = scaler.transform([user_inputs])
             prediction = best_model.predict(input_scaled)

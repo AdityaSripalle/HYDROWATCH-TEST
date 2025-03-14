@@ -6,6 +6,9 @@ from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, f1_score, mean_absolute_error, r2_score
 from imblearn.over_sampling import SMOTE
 
@@ -59,15 +62,14 @@ if uploaded_file:
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
 
-        # Train models (with hyperparameter tuning to prevent overfitting)
+        # Train models (Hyperparameter tuning included)
         models = {
-            'Random Forest': RandomForestClassifier(
-                n_estimators=100, max_depth=10, min_samples_split=5, min_samples_leaf=3, random_state=42
-            ),
+            'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=10, min_samples_split=5, min_samples_leaf=3, random_state=42),
+            'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, min_samples_split=5, random_state=42),
             'SVM': SVC(kernel='rbf', C=1, random_state=42, probability=True),
-            'Gradient Boosting': GradientBoostingClassifier(
-                n_estimators=100, learning_rate=0.1, max_depth=3, min_samples_split=5, random_state=42
-            )
+            'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5, metric='minkowski', p=2),
+            'Decision Tree': DecisionTreeClassifier(max_depth=8, min_samples_split=5, random_state=42),
+            'Logistic Regression': LogisticRegression(max_iter=1000, solver='lbfgs', random_state=42)
         }
 
         results = {}
@@ -76,7 +78,7 @@ if uploaded_file:
             y_train_pred = model.predict(X_train)  # Predictions on training data
             y_test_pred = model.predict(X_test)  # Predictions on testing data
 
-            # Cross-validation score to measure true generalization
+            # Cross-validation accuracy for generalization check
             cross_val_accuracy = np.mean(cross_val_score(model, X_train, y_train, cv=5))
 
             results[name] = {
@@ -97,6 +99,16 @@ if uploaded_file:
         # Select best model based on Testing Accuracy
         best_model_name = max(results, key=lambda x: results[x]['Testing Accuracy'])
         best_model = models[best_model_name]
+
+        # Visualization - Training vs Testing Accuracy
+        st.subheader("📈 Training vs Testing Accuracy Comparison")
+        fig, ax = plt.subplots()
+        results_df[['Training Accuracy', 'Testing Accuracy']].plot(kind='bar', ax=ax, figsize=(10, 5), colormap='coolwarm')
+        plt.xticks(rotation=45)
+        plt.ylabel("Accuracy")
+        plt.title("Training vs Testing Accuracy for Different Models")
+        plt.legend()
+        st.pyplot(fig)
 
         # Prediction Interface
         st.subheader("🔮 Predict Water Quality")
